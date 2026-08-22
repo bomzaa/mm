@@ -1,0 +1,130 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Entity Validators
+    function isValidUserProfile(data, userId) {
+      return data.id is string && data.id == userId &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 150 &&
+             data.gradeLevel is string && data.gradeLevel.size() <= 50 &&
+             data.dreamFaculty is string && data.dreamFaculty.size() <= 100 &&
+             data.dreamUniversity is string && data.dreamUniversity.size() <= 100 &&
+             (!('targetScoreTGAT' in data) || data.targetScoreTGAT is number) &&
+             (!('targetScoreTPAT' in data) || data.targetScoreTPAT is number) &&
+             (!('targetScoreALevel' in data) || data.targetScoreALevel is number) &&
+             (!('dailyGoalQuestions' in data) || data.dailyGoalQuestions is number) &&
+             (!('streakDays' in data) || data.streakDays is number) &&
+             (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 500));
+    }
+
+    function isValidExamHistory(data, userId) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == userId &&
+             data.examId is string && data.examId.size() <= 128 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.category is string && data.category.size() <= 50 &&
+             data.subject is string && data.subject.size() <= 100 &&
+             data.score is number &&
+             data.totalQuestions is number &&
+             data.percentage is number &&
+             data.completedAt is string && data.completedAt.size() <= 50;
+    }
+
+    function isValidCustomExam(data, userId) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == userId &&
+             data.title is string && data.title.size() <= 200 &&
+             data.category is string && data.category.size() <= 50 &&
+             data.subject is string && data.subject.size() <= 100 &&
+             data.difficulty is string && data.difficulty.size() <= 50 &&
+             data.timeLimitMinutes is number &&
+             data.questions is list && data.questions.size() <= 100 &&
+             data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    function isValidChatMessage(data, userId) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == userId &&
+             data.role is string && (data.role == 'user' || data.role == 'model') &&
+             data.content is string && data.content.size() <= 10000 &&
+             data.timestamp is string && data.timestamp.size() <= 50;
+    }
+
+    function isValidAnalysisReport(data, userId) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == userId &&
+             data.readinessScore is number &&
+             data.estimatedPercentile is string && data.estimatedPercentile.size() <= 50 &&
+             data.overview is string && data.overview.size() <= 2000 &&
+             data.analyzedAt is string && data.analyzedAt.size() <= 50;
+    }
+
+    // Rules for User Profile & User Subcollections
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Users can only access their own document directly
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming(), userId);
+      allow update: if isOwner(userId) && isValidUserProfile(incoming(), userId);
+      allow delete: if isOwner(userId);
+
+      // Subcollection: Exam History
+      match /examHistory/{historyId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(historyId) && isValidExamHistory(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(historyId) && isValidExamHistory(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection: Custom Exams
+      match /customExams/{examId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(examId) && isValidCustomExam(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(examId) && isValidCustomExam(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection: Chat Messages
+      match /chatMessages/{messageId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(messageId) && isValidChatMessage(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(messageId) && isValidChatMessage(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection: Analysis Reports
+      match /analysisReports/{reportId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(reportId) && isValidAnalysisReport(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(reportId) && isValidAnalysisReport(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

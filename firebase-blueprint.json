@@ -1,0 +1,123 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile including study targets, grade level, and streak info",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "format": "email", "maxLength": 150 },
+        "avatarUrl": { "type": "string", "maxLength": 500 },
+        "gradeLevel": { "type": "string", "maxLength": 50 },
+        "dreamFaculty": { "type": "string", "maxLength": 100 },
+        "dreamUniversity": { "type": "string", "maxLength": 100 },
+        "targetScoreTGAT": { "type": "number" },
+        "targetScoreTPAT": { "type": "number" },
+        "targetScoreALevel": { "type": "number" },
+        "dailyGoalQuestions": { "type": "number" },
+        "streakDays": { "type": "number" },
+        "joinedDate": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name", "email", "gradeLevel", "dreamFaculty", "dreamUniversity"]
+    },
+    "ExamHistory": {
+      "title": "ExamHistory",
+      "description": "Record of a completed exam attempt",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "examId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 50 },
+        "subject": { "type": "string", "maxLength": 100 },
+        "difficulty": { "type": "string", "maxLength": 50 },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "percentage": { "type": "number" },
+        "timeSpentSeconds": { "type": "number" },
+        "completedAt": { "type": "string", "maxLength": 50 },
+        "questions": { "type": "array" }
+      },
+      "required": ["id", "userId", "examId", "title", "category", "subject", "score", "totalQuestions", "percentage", "completedAt"]
+    },
+    "CustomExam": {
+      "title": "CustomExam",
+      "description": "AI-generated exam or custom practice test set",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 50 },
+        "subject": { "type": "string", "maxLength": 100 },
+        "topic": { "type": "string", "maxLength": 100 },
+        "difficulty": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 500 },
+        "timeLimitMinutes": { "type": "number" },
+        "questions": { "type": "array" },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "title", "category", "subject", "difficulty", "timeLimitMinutes", "questions", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Chat interaction message between user and AI tutor",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["user", "model"], "maxLength": 20 },
+        "content": { "type": "string", "maxLength": 10000 },
+        "timestamp": { "type": "string", "maxLength": 50 },
+        "suggestedQuestions": { "type": "array" },
+        "category": { "type": "string", "maxLength": 50 },
+        "subject": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["id", "userId", "role", "content", "timestamp"]
+    },
+    "AnalysisReport": {
+      "title": "AnalysisReport",
+      "description": "AI-generated performance analysis report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "readinessScore": { "type": "number" },
+        "estimatedPercentile": { "type": "string", "maxLength": 50 },
+        "overview": { "type": "string", "maxLength": 2000 },
+        "targetFacultyFeedback": { "type": "string", "maxLength": 2000 },
+        "strengths": { "type": "array" },
+        "weaknesses": { "type": "array" },
+        "weeklyPlan": { "type": "array" },
+        "tips": { "type": "array" },
+        "analyzedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "readinessScore", "estimatedPercentile", "overview", "analyzedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile with study goals and target scores"
+    },
+    "/users/{userId}/examHistory/{historyId}": {
+      "schema": "ExamHistory",
+      "description": "Completed mock test attempts and scores"
+    },
+    "/users/{userId}/customExams/{examId}": {
+      "schema": "CustomExam",
+      "description": "Generated or saved exams for practice"
+    },
+    "/users/{userId}/chatMessages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chat history with AI tutor"
+    },
+    "/users/{userId}/analysisReports/{reportId}": {
+      "schema": "AnalysisReport",
+      "description": "AI analysis reports on exam performance"
+    }
+  }
+}
