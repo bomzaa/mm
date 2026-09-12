@@ -47,7 +47,7 @@ export const StorageService = {
   },
 
   getExamHistory: (): ExamHistoryItem[] => {
-    return safeGet<ExamHistoryItem[]>(KEYS.EXAM_HISTORY, [
+    const rawList = safeGet<ExamHistoryItem[]>(KEYS.EXAM_HISTORY, [
       {
         id: 'hist-demo-1',
         examId: 'sample-tgat1-01',
@@ -63,11 +63,24 @@ export const StorageService = {
         questions: SAMPLE_EXAMS[0].questions,
       },
     ]);
+
+    // Deduplicate by ID
+    const seenIds = new Set<string>();
+    const deduplicated: ExamHistoryItem[] = [];
+    for (const item of rawList) {
+      if (item && item.id && !seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        deduplicated.push(item);
+      }
+    }
+    return deduplicated;
   },
 
   saveExamAttempt: (item: ExamHistoryItem): void => {
     const history = StorageService.getExamHistory();
-    const updated = [item, ...history];
+    // Filter out any existing item with the same id to prevent duplicate keys
+    const filtered = history.filter((h) => h.id !== item.id);
+    const updated = [item, ...filtered];
     safeSet(KEYS.EXAM_HISTORY, updated);
 
     // Update streak if today
@@ -76,8 +89,26 @@ export const StorageService = {
     StorageService.saveProfile(profile);
   },
 
+  deleteExamAttempt: (id: string): void => {
+    const history = StorageService.getExamHistory().filter((item) => item.id !== id);
+    safeSet(KEYS.EXAM_HISTORY, history);
+  },
+
+  clearExamHistory: (): void => {
+    safeSet(KEYS.EXAM_HISTORY, []);
+  },
+
   getSavedExams: (): ExamData[] => {
     return safeGet<ExamData[]>(KEYS.SAVED_EXAMS, SAMPLE_EXAMS);
+  },
+
+  getAllExams: (): ExamData[] => {
+    return StorageService.getSavedExams();
+  },
+
+  getExam: (examId: string): ExamData | null => {
+    const list = StorageService.getSavedExams();
+    return list.find((e) => e.id === examId) || null;
   },
 
   saveExam: (exam: ExamData): void => {
@@ -92,6 +123,10 @@ export const StorageService = {
     safeSet(KEYS.SAVED_EXAMS, list);
   },
 
+  saveCustomExam: (exam: ExamData): void => {
+    StorageService.saveExam(exam);
+  },
+
   deleteExam: (examId: string): void => {
     const list = StorageService.getSavedExams().filter((e) => e.id !== examId);
     safeSet(KEYS.SAVED_EXAMS, list);
@@ -102,20 +137,13 @@ export const StorageService = {
       {
         id: 'msg-welcome',
         role: 'model',
-        content: `สวัสดีครับ! ยินดีต้อนรับสู่ **AI Exam Coach** ติวเตอร์อัจฉริยะสำหรับเตรียมสอบ TGAT, TPAT, A-Level, O-NET และข้อสอบโรงเรียน 🎯
-
-คุณสามารถ:
-1. **ถามเจาะลึกเนื้อหาหรือสูตร**: เช่น *"ขอเทคนิคทำโจทย์อนุกรม TGAT2 แบบเร็ว"*, *"สรุปสูตรแคลคูลัส A-Level 61"*, *"วิเคราะห์ความแตกต่างระหว่าง TGAT3 แต่ละพาร์ท"*
-2. **สร้างโจทย์ฝึกทำ**: ให้ AI ออกโจทย์เฉพาะเรื่องที่ยังไม่มั่นใจ
-3. **ช่วยเฉลยข้อสอบ**: พิมพ์โจทย์มาให้ผมอธิบายวิธีคิดเป็นขั้นเป็นตอนได้เลยครับ!
-
-วันนี้อยากเริ่มติววิชาไหนเป็นพิเศษดีครับ?`,
+        content: `สวัสดีครับ! ยินดีต้อนรับสู่ AI Study Buddy Smart Learning Station 🚀 ผมเป็นผู้ช่วยเรียนรู้ AI ของคุณ สามารถถามเนื้อหาบทเรียน เฉลยข้อสอบ ให้ช่วยอธิบายโจทย์ หรือวิเคราะห์จุดแข็งจุดอ่อนได้เลยครับ!`,
         timestamp: new Date().toISOString(),
         suggestedQuestions: [
-          'สรุปโครงสร้างข้อสอบ TGAT 1, 2, 3 ปีล่าสุด',
-          'ขอเทคนิคการทำข้อสอบ TPAT3 ความถนัดวิศวะ/วิทย์',
-          'สรุปสูตรลัดฟิสิกส์ A-Level เรื่องการเคลื่อนที่',
-          'วางแผนอ่านหนังสือสอบ TCAS ภายใน 3 เดือน',
+          'อธิบายเรื่องฟังก์ชันคณิตศาสตร์',
+          'เฉลยโจทย์ภาษาอังกฤษ Grammar',
+          'วิเคราะห์จุดแข็งจุดอ่อนการเรียน',
+          'สร้างโจทย์ฝึกหัดเพิ่มอีก 3 ข้อ',
         ],
       },
     ]);

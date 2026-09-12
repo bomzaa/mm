@@ -126,5 +126,33 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
     }
+
+    // Collection: Official Exam Bank (e.g. TPAT3 ธ.ค. 66)
+    match /officialExams/{examId} {
+      allow get, list: if true; // Publicly accessible to all students for studying
+      allow create, update: if isSignedIn() && isValidId(examId);
+      allow delete: if isSignedIn();
+    }
+
+    // Collection: Admin Curated Exam Preparation Sets
+    match /exams/exam_preparation/items/{examId} {
+      allow get, list: if true; // Publicly readable for all students to study
+      allow create, update: if isSignedIn() && isValidId(examId);
+      allow delete: if isSignedIn();
+    }
+
+    // Top-level alias for exam_preparation
+    match /exam_preparation/{examId} {
+      allow get, list: if true;
+      allow create, update: if isSignedIn() && isValidId(examId);
+      allow delete: if isSignedIn();
+    }
+
+    // Collection: AI Practice Exams
+    match /exams/ai_practice/items/{examId} {
+      allow get, list: if true;
+      allow create, update: if isSignedIn() && isValidId(examId);
+      allow delete: if isSignedIn();
+    }
   }
 }

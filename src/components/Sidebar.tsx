@@ -1,16 +1,16 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import {
-  MessageSquare,
-  Sparkles,
+  Home,
+  MessageSquareText,
+  FileEdit,
+  Clock,
+  Gamepad2,
+  BookOpen,
   BarChart2,
-  History,
-  User,
-  HelpCircle,
-  ShieldCheck,
+  Settings,
   LogOut,
   X,
-  Target,
-  Flame,
   BookOpenCheck,
 } from 'lucide-react';
 import { UserProfile } from '../types';
@@ -35,190 +35,138 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile = false,
   onCloseMobile,
 }) => {
-  // Exact 7 Navigation Items in strict specified order:
-  // 1. Chatbot
-  // 2. สร้างข้อสอบด้วย AI
-  // 3. Dashboard
-  // 4. ประวัติข้อสอบ
-  // 5. โปรไฟล์
-  // 6. วิธีการใช้งาน
-  // 7. บัญชีผู้ใช้งาน
+  // Navigation Items matching the design:
+  // 1. หน้าหลัก (home)
+  // 2. AI ติวเตอร์ (แชทบอท) (chatbot)
+  // 3. สร้างข้อสอบ (generator)
+  // 4. ประวัติข้อสอบ (history)
+  // 5. วิธีการใช้งาน (guide)
+  // 6. สถิติการเรียน (analytics)
+  // 7. มินิเกม (minigame)
+  // 8. ตั้งค่า (settings)
   const navItems = [
     {
+      id: 'home' as NavTab,
+      label: 'หน้าหลัก',
+      icon: Home,
+    },
+    {
       id: 'chatbot' as NavTab,
-      label: 'Chatbot',
-      icon: MessageSquare,
+      label: 'AI ติวเตอร์ (แชทบอท)',
+      icon: MessageSquareText,
     },
     {
       id: 'generator' as NavTab,
-      label: 'สร้างข้อสอบด้วย AI',
-      icon: Sparkles,
-    },
-    {
-      id: 'dashboard' as NavTab,
-      label: 'Dashboard',
-      icon: BarChart2,
+      label: 'สร้างข้อสอบ',
+      icon: FileEdit,
     },
     {
       id: 'history' as NavTab,
       label: 'ประวัติข้อสอบ',
-      icon: History,
-    },
-    {
-      id: 'profile' as NavTab,
-      label: 'โปรไฟล์',
-      icon: User,
+      icon: Clock,
     },
     {
       id: 'guide' as NavTab,
       label: 'วิธีการใช้งาน',
-      icon: HelpCircle,
+      icon: BookOpen,
     },
     {
-      id: 'account' as NavTab,
-      label: 'บัญชีผู้ใช้งาน',
-      icon: ShieldCheck,
+      id: 'analytics' as NavTab,
+      label: 'สถิติการเรียน',
+      icon: BarChart2,
+    },
+    {
+      id: 'minigame' as NavTab,
+      label: 'มินิเกม',
+      icon: Gamepad2,
+    },
+    {
+      id: 'settings' as NavTab,
+      label: 'ตั้งค่า',
+      icon: Settings,
     },
   ];
 
   const content = (
-    <div className="h-full flex flex-col bg-slate-900 text-white w-64 select-none">
+    <div className="h-full flex flex-col bg-white text-slate-800 w-64 select-none border-r border-slate-100">
       {/* Brand Header */}
       <div className="p-6 pb-4">
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-6">
           <div
             onClick={() => {
-              onSelectTab('chatbot');
+              onSelectTab('home');
               if (onCloseMobile) onCloseMobile();
             }}
             className="flex items-center gap-3 cursor-pointer group"
           >
-            <div className="w-10 h-10 bg-blue-600 group-hover:bg-blue-500 rounded-xl flex items-center justify-center font-bold text-xl text-white shadow-md shadow-blue-600/30 transition-all">
-              <BookOpenCheck className="w-5 h-5 stroke-[2.2]" />
+            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center font-bold text-white shadow-xs shadow-blue-500/20 group-hover:scale-105 transition-transform">
+              <BookOpenCheck className="w-5 h-5 stroke-[2.4]" />
             </div>
-            <div>
-              <span className="text-lg font-bold tracking-tight block text-white">
-                AI Study Buddy
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium block -mt-0.5">
-                Smart Learning Station
-              </span>
-            </div>
+            <span className="text-base font-bold tracking-tight text-slate-900">
+              AI Study Buddy
+            </span>
           </div>
 
           {onCloseMobile && (
             <button
               onClick={onCloseMobile}
               aria-label="ปิดเมนู"
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg md:hidden"
+              className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg md:hidden"
             >
               <X className="w-5 h-5" />
             </button>
           )}
         </div>
 
-        {/* Navigation Menu */}
-        <nav className="space-y-1">
+        {/* Navigation Menu with sliding active layout animation */}
+        <nav className="space-y-1.5 relative">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
             return (
-              <button
+              <motion.button
                 key={item.id}
                 id={`sidebar-nav-${item.id}`}
+                whileHover={{ x: 2 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => {
                   onSelectTab(item.id);
                   if (onCloseMobile) onCloseMobile();
                 }}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
+                className={`w-full relative flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-left cursor-pointer transition-colors ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25 font-bold'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    ? 'text-blue-600 font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? 'opacity-100 text-white' : 'opacity-70'}`} />
-                <span>{item.label}</span>
-              </button>
+                {isActive && (
+                  <motion.div
+                    layoutId="activeSidebarTab"
+                    className="absolute inset-0 bg-blue-50/90 rounded-xl"
+                    transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                  />
+                )}
+                <Icon
+                  className={`w-4.5 h-4.5 shrink-0 relative z-10 transition-colors ${
+                    isActive ? 'text-blue-600' : 'text-slate-500'
+                  }`}
+                />
+                <span className="truncate relative z-10">{item.label}</span>
+              </motion.button>
             );
           })}
         </nav>
       </div>
 
-      {/* Target Faculty Widget */}
-      <div className="px-6 py-2">
-        <div
-          onClick={() => {
-            onSelectTab('profile');
-            if (onCloseMobile) onCloseMobile();
-          }}
-          className="p-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl cursor-pointer transition-colors space-y-1.5"
+      {/* Bottom Section: Logout Button (Matching Screenshot) */}
+      <div className="mt-auto p-4 border-t border-slate-100">
+        <button
+          onClick={onLogout}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
         >
-          <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-            <span className="flex items-center gap-1">
-              <Target className="w-3.5 h-3.5 text-blue-400" />
-              <span>เป้าหมายสอบเข้า</span>
-            </span>
-            <span className="flex items-center gap-0.5 text-amber-400 font-bold">
-              <Flame className="w-3 h-3 fill-amber-400" />
-              <span>{user.streakDays || 1}d</span>
-            </span>
-          </div>
-          <p className="text-xs font-bold text-slate-200 truncate">
-            {user.dreamFaculty || 'ตั้งเป้าหมายคณะ'}
-          </p>
-          <p className="text-[10px] text-slate-400 truncate">
-            {user.dreamUniversity || user.gradeLevel}
-          </p>
-        </div>
-      </div>
-
-      {/* Bottom User Profile Section */}
-      <div className="mt-auto p-4 border-t border-slate-800 space-y-2">
-        {/* Firestore Live Status Indicator */}
-        <div className="flex items-center justify-between px-2 text-[10px] text-slate-400">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-            <span>Firebase Auth & DB</span>
-          </span>
-          <span className="text-emerald-400 font-medium">เชื่อมต่อแล้ว</span>
-        </div>
-
-        <div className="flex items-center justify-between gap-2 p-2 rounded-xl hover:bg-slate-800/70 transition-colors">
-          <div
-            onClick={() => {
-              onSelectTab('profile');
-              if (onCloseMobile) onCloseMobile();
-            }}
-            className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
-          >
-            <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden shrink-0 border border-slate-600">
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-blue-500 flex items-center justify-center font-bold text-xs text-white">
-                  {user.name.charAt(0) || 'U'}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold text-slate-200 truncate">
-                {user.name}
-              </span>
-              <span className="text-[10px] text-slate-400 truncate">
-                {user.email}
-              </span>
-            </div>
-          </div>
-
-          <button
-            onClick={onLogout}
-            title="ออกจากระบบ"
-            aria-label="ออกจากระบบ"
-            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
+          <LogOut className="w-4 h-4 shrink-0" />
+          <span>ออกจากระบบ</span>
+        </button>
       </div>
     </div>
   );
@@ -226,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Desktop Persistent Sidebar */}
-      <aside className="w-64 bg-slate-900 text-white flex-col shrink-0 hidden md:flex h-screen sticky top-0 z-30">
+      <aside className="w-64 bg-white flex-col shrink-0 hidden md:flex h-screen sticky top-0 z-30">
         {content}
       </aside>
 
@@ -234,7 +182,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isOpenMobile && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
             onClick={onCloseMobile}
           />
           <div className="relative z-10 w-64 max-w-[80vw] h-full shadow-2xl animate-in slide-in-from-left duration-200">
@@ -245,4 +193,3 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </>
   );
 };
-

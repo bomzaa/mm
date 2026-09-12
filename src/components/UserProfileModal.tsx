@@ -69,10 +69,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   };
 
   const handleClearHistory = () => {
-    if (confirm('คำเตือน: คุณต้องการล้างประวัติการทำข้อสอบทั้งหมดใช่หรือไม่? (ไม่สามารถกู้คืนได้)')) {
-      StorageService.clearAllData();
-      window.location.reload();
-    }
+    StorageService.clearAllData();
+    window.location.reload();
   };
 
   return (
@@ -162,11 +160,18 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 onChange={(e) => setGradeLevel(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
               >
-                <option value="มัธยมศึกษาปีที่ 4">มัธยมศึกษาปีที่ 4 (ม.4)</option>
-                <option value="มัธยมศึกษาปีที่ 5">มัธยมศึกษาปีที่ 5 (ม.5)</option>
-                <option value="มัธยมศึกษาปีที่ 6">มัธยมศึกษาปีที่ 6 (ม.6 TCAS69)</option>
-                <option value="เด็กซิ่ว / ซิ่วเตรียมสอบ">เด็กซิ่ว / ซิ่วเตรียมสอบ</option>
-                <option value="บุคคลทั่วไป">บุคคลทั่วไป / เตรียมสอบครู/แพทย์</option>
+                <option value="ประถมศึกษาปีที่ 1 (ป.1)">ประถมศึกษาปีที่ 1 (ป.1)</option>
+                <option value="ประถมศึกษาปีที่ 2 (ป.2)">ประถมศึกษาปีที่ 2 (ป.2)</option>
+                <option value="ประถมศึกษาปีที่ 3 (ป.3)">ประถมศึกษาปีที่ 3 (ป.3)</option>
+                <option value="ประถมศึกษาปีที่ 4 (ป.4)">ประถมศึกษาปีที่ 4 (ป.4)</option>
+                <option value="ประถมศึกษาปีที่ 5 (ป.5)">ประถมศึกษาปีที่ 5 (ป.5)</option>
+                <option value="ประถมศึกษาปีที่ 6 (ป.6)">ประถมศึกษาปีที่ 6 (ป.6)</option>
+                <option value="มัธยมศึกษาปีที่ 1 (ม.1)">มัธยมศึกษาปีที่ 1 (ม.1)</option>
+                <option value="มัธยมศึกษาปีที่ 2 (ม.2)">มัธยมศึกษาปีที่ 2 (ม.2)</option>
+                <option value="มัธยมศึกษาปีที่ 3 (ม.3)">มัธยมศึกษาปีที่ 3 (ม.3)</option>
+                <option value="มัธยมศึกษาปีที่ 4 (ม.4)">มัธยมศึกษาปีที่ 4 (ม.4)</option>
+                <option value="มัธยมศึกษาปีที่ 5 (ม.5)">มัธยมศึกษาปีที่ 5 (ม.5)</option>
+                <option value="มัธยมศึกษาปีที่ 6 (ม.6)">มัธยมศึกษาปีที่ 6 (ม.6)</option>
               </select>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   BarChart2,
   TrendingUp,
@@ -12,6 +12,9 @@ import {
   RefreshCw,
   Zap,
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  MoveHorizontal,
 } from 'lucide-react';
 import {
   Radar,
@@ -62,12 +65,109 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     { subject: 'A-Level วิทย์/สังคม', score: Math.min(100, (user.targetScoreALevel || 70) + 5) },
   ];
 
-  // History timeline data
-  const historyChartData = history.slice(0, 7).reverse().map((h, idx) => ({
-    name: `ครั้งที่ ${idx + 1}`,
-    score: h.percentage,
-    subject: h.subject,
-  }));
+  // History timeline data: All attempts mapped in chronological order (attempt 1, 2, 3...)
+  const historyChartData = useMemo(() => {
+    if (!history || history.length === 0) return [];
+    
+    // Sort oldest first so ครั้งที่ 1 is the 1st attempt, ครั้งที่ 2 is 2nd, etc.
+    const sorted = [...history].sort(
+      (a, b) => new Date(a.completedAt || 0).getTime() - new Date(b.completedAt || 0).getTime()
+    );
+
+    return sorted.map((h, idx) => {
+      const d = new Date(h.completedAt);
+      const dateText = !isNaN(d.getTime())
+        ? d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
+        : '';
+      return {
+        id: h.id,
+        name: `ครั้งที่ ${idx + 1}`,
+        attemptIndex: idx + 1,
+        score: h.percentage,
+        rawScore: h.score,
+        totalQuestions: h.totalQuestions,
+        subject: h.subject || h.title,
+        title: h.title,
+        category: h.category,
+        date: dateText,
+      };
+    });
+  }, [history]);
+
+  // Horizontal Scroll & Drag-to-Scroll refs and state
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeftStart, setScrollLeftStart] = useState(0);
+
+  // Check scroll boundaries
+  const updateScrollButtons = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      const hasOverflow = el.scrollWidth > el.clientWidth + 5;
+      setCanScrollLeft(el.scrollLeft > 10);
+      setCanScrollRight(hasOverflow && el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
+    }
+  }, []);
+
+  // Auto-scroll to the newest attempts (far right) on mount or data change
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.scrollLeft = el.scrollWidth;
+      updateScrollButtons();
+    }
+  }, [historyChartData.length, updateScrollButtons]);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    updateScrollButtons();
+    window.addEventListener('resize', updateScrollButtons);
+    return () => window.removeEventListener('resize', updateScrollButtons);
+  }, [updateScrollButtons]);
+
+  const handleScrollClick = (direction: 'left' | 'right') => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      const step = 200;
+      el.scrollBy({
+        left: direction === 'left' ? -step : step,
+        behavior: 'smooth',
+      });
+      setTimeout(updateScrollButtons, 300);
+    }
+  };
+
+  // Mouse Drag to Scroll handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    setIsDragging(true);
+    setStartX(e.pageX - el.offsetLeft);
+    setScrollLeftStart(el.scrollLeft);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    e.preventDefault();
+    const x = e.pageX - el.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    el.scrollLeft = scrollLeftStart - walk;
+    updateScrollButtons();
+  };
+
+  const handleMouseUpOrLeave = () => {
+    setIsDragging(false);
+    updateScrollButtons();
+  };
+
+  // Dynamic Chart Width Calculation: scales comfortably with attempt count
+  const chartDynamicWidth = Math.max(480, historyChartData.length * 64);
 
   const handleRunAIAnalysis = async () => {
     setIsAnalyzing(true);
@@ -253,32 +353,113 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
         {/* History Bar Progression Chart (6 cols) */}
         <div className="lg:col-span-6 bg-white rounded-3xl p-6 border border-slate-200 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between gap-2 mb-4">
             <div>
               <h3 className="font-black text-slate-800 text-base">แนวโน้มคะแนนสอบย้อนหลัง (%)</h3>
               <p className="text-xs text-slate-500">พัฒนาการจากชุดข้อสอบจำลองล่าสุด</p>
             </div>
+
+            {/* Scroll Navigation Controls */}
+            {historyChartData.length > 0 && (
+              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200/80 shrink-0">
+                <button
+                  type="button"
+                  id="chart-scroll-left-btn"
+                  onClick={() => handleScrollClick('left')}
+                  disabled={!canScrollLeft}
+                  className="p-1.5 rounded-lg hover:bg-white hover:shadow-2xs text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+                  title="เลื่อนไปทางซ้าย (ดูครั้งก่อนหน้า)"
+                  aria-label="เลื่อนซ้าย"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-[11px] font-bold text-slate-600 px-1.5 select-none">
+                  {historyChartData.length} ครั้ง
+                </span>
+                <button
+                  type="button"
+                  id="chart-scroll-right-btn"
+                  onClick={() => handleScrollClick('right')}
+                  disabled={!canScrollRight}
+                  className="p-1.5 rounded-lg hover:bg-white hover:shadow-2xs text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+                  title="เลื่อนไปทางขวา (ดูครั้งล่าสุด)"
+                  aria-label="เลื่อนขวา"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {historyChartData.length > 0 ? (
-            <div className="w-full h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={historyChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    formatter={(value: any) => [`${value}%`, 'คะแนน']}
-                    labelFormatter={(label, payload) => {
-                      if (payload && payload.length > 0) {
-                        return `${label}: ${payload[0].payload.subject}`;
-                      }
-                      return label;
-                    }}
-                  />
-                  <Bar dataKey="score" fill="#6366f1" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="space-y-2">
+              {/* Horizontally Scrollable Chart Area */}
+              <div
+                ref={scrollContainerRef}
+                onScroll={updateScrollButtons}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUpOrLeave}
+                onMouseLeave={handleMouseUpOrLeave}
+                className={`w-full overflow-x-auto custom-scrollbar pb-2 select-none ${
+                  isDragging ? 'cursor-grabbing' : 'cursor-grab'
+                }`}
+                style={{ scrollbarWidth: 'thin' }}
+              >
+                <div style={{ width: `${chartDynamicWidth}px`, height: '280px', minWidth: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={historyChartData}
+                      margin={{ top: 10, right: 20, left: -15, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 11, fill: '#64748b' }}
+                        interval={0}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        ticks={[0, 25, 50, 75, 100]}
+                        tick={{ fontSize: 11, fill: '#64748b' }}
+                      />
+                      <Tooltip
+                        formatter={(value: any) => [`${value}%`, 'คะแนนความถูกต้อง']}
+                        labelFormatter={(label, payload) => {
+                          if (payload && payload.length > 0) {
+                            const item = payload[0].payload;
+                            return `${label}: ${item.title || item.subject} ${item.date ? `(${item.date})` : ''}`;
+                          }
+                          return label;
+                        }}
+                        contentStyle={{
+                          borderRadius: '12px',
+                          borderColor: '#e2e8f0',
+                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                          fontSize: '12px',
+                        }}
+                      />
+                      <Bar
+                        dataKey="score"
+                        fill="#6366f1"
+                        radius={[6, 6, 0, 0]}
+                        maxBarSize={44}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Scroll guide text / indicator */}
+              <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                <span className="flex items-center gap-1">
+                  <MoveHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                  <span>ลากเมาส์ หรือปัดเพื่อเลื่อนซ้าย-ขวา</span>
+                </span>
+                <span>
+                  {canScrollLeft ? '👈 มีครั้งก่อนหน้า' : 'ครั้งแรก'} • {canScrollRight ? 'มีครั้งล่าสุด 👉' : 'ครั้งล่าสุด'}
+                </span>
+              </div>
             </div>
           ) : (
             <div className="h-72 flex flex-col items-center justify-center text-slate-400 text-xs space-y-2">

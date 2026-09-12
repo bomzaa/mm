@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Sidebar } from './components/Sidebar';
 import { Navbar, NavTab } from './components/Navbar';
+import { HomeDashboard } from './components/HomeDashboard';
 import { ChatTutor } from './components/ChatTutor';
 import { ExamGenerator } from './components/ExamGenerator';
 import { ExamTakingModal } from './components/ExamTakingModal';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { ExamHistory } from './components/ExamHistory';
 import { LoginPage } from './components/LoginPage';
-import { ProfileView } from './components/ProfileView';
 import { UserGuideView } from './components/UserGuideView';
-import { AccountView } from './components/AccountView';
+import { SettingsView } from './components/SettingsView';
+import { MiniGameView } from './components/MiniGameView';
+import { PixelCompanion } from './components/Companion/PixelCompanion';
 import { ExamCategory, ExamData, ExamHistoryItem, UserProfile } from './types';
 import { StorageService } from './lib/storage';
 import { auth } from './lib/firebase';
@@ -24,8 +27,8 @@ export default function App() {
   const [user, setUser] = useState<UserProfile>(() => StorageService.getProfile());
   const [history, setHistory] = useState<ExamHistoryItem[]>(() => StorageService.getExamHistory());
 
-  // Protected Route Navigation State: default to 'chatbot'
-  const [currentTab, setCurrentTab] = useState<NavTab>('chatbot');
+  // Protected Route Navigation State: default to 'home' (หน้าหลัก)
+  const [currentTab, setCurrentTab] = useState<NavTab>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Active CBT test modal
@@ -41,17 +44,23 @@ export default function App() {
   // Helper to resolve route tab from URL pathname
   const resolveTabFromPath = (pathname: string): NavTab => {
     const clean = pathname.toLowerCase().replace(/^\/+|\/+$/g, '');
+    if (clean === 'home' || clean === 'main') return 'home';
+    if (clean === 'chatbot' || clean === 'chat' || clean === 'tutor') return 'chatbot';
     if (clean === 'generator' || clean === 'exam-generator') return 'generator';
-    if (clean === 'dashboard' || clean === 'analytics') return 'dashboard';
-    if (clean === 'exam-history' || clean === 'history') return 'history';
-    if (clean === 'profile') return 'profile';
+    if (clean === 'history' || clean === 'exam-history') return 'history';
+    if (clean === 'minigame' || clean === 'game' || clean === 'games' || clean === 'mini-game') return 'minigame';
     if (clean === 'guide' || clean === 'how-to-use') return 'guide';
-    if (clean === 'account' || clean === 'user-account') return 'account';
-    return 'chatbot';
+    if (clean === 'analytics' || clean === 'dashboard' || clean === 'stats') return 'analytics';
+    if (clean === 'settings' || clean === 'profile' || clean === 'account') return 'settings';
+    return 'home';
   };
 
   // Safe navigation handler with URL pushState synchronization
   const handleTabChange = useCallback((tab: NavTab) => {
+    if (tab === 'generator') {
+      setGeneratorSubjectId(undefined);
+      setGeneratorCategory(undefined);
+    }
     setCurrentTab(tab);
     const targetUrl = `/${tab}`;
     if (window.location.pathname !== targetUrl) {
@@ -68,12 +77,16 @@ export default function App() {
         setIsLoggedIn(true);
         StorageService.setLoggedIn(true);
 
-        // Determine target tab from current URL or default to 'chatbot'
+        // Determine target tab from current URL or default to 'home'
         const initialTab = resolveTabFromPath(window.location.pathname);
         setCurrentTab(initialTab);
-        if (window.location.pathname === '/login' || window.location.pathname === '/' || window.location.pathname === '') {
-          window.history.replaceState({ tab: 'chatbot' }, '', '/chatbot');
-          setCurrentTab('chatbot');
+        if (
+          window.location.pathname === '/login' ||
+          window.location.pathname === '/' ||
+          window.location.pathname === ''
+        ) {
+          window.history.replaceState({ tab: 'home' }, '', '/home');
+          setCurrentTab('home');
         }
 
         // Fetch or sync user profile from Firestore
@@ -159,16 +172,15 @@ export default function App() {
     return Math.min(98, Math.max(30, avg));
   }, [history]);
 
-  // Handle successful login: Strictly Redirect to Chatbot
+  // Handle successful login: Redirect to 'home' (หน้าหลัก)
   const handleLoginSuccess = (profile: UserProfile) => {
     setUser(profile);
     setIsLoggedIn(true);
     StorageService.saveProfile(profile);
     StorageService.setLoggedIn(true);
 
-    // CRITICAL: Chatbot is the main screen of the app. Redirect directly to Chatbot!
-    setCurrentTab('chatbot');
-    window.history.replaceState({ tab: 'chatbot' }, '', '/chatbot');
+    setCurrentTab('home');
+    window.history.replaceState({ tab: 'home' }, '', '/home');
   };
 
   // Handle Logout: Clean session and redirect to /login
@@ -202,6 +214,8 @@ export default function App() {
     const examToRetake: ExamData = {
       id: `retake-${Date.now()}`,
       title: historyItem.title,
+      gradeLevel: historyItem.questions[0]?.gradeLevel || 'ม.6',
+      subjectCategory: historyItem.questions[0]?.subjectCategory || 'วิชาพื้นฐาน',
       category: historyItem.category,
       subject: historyItem.subject,
       difficulty: (historyItem.difficulty as any) || 'ปานกลาง',
@@ -216,9 +230,11 @@ export default function App() {
     setActiveExam(examToRetake);
   };
 
-  const handleNavigateToGeneratorFromChat = (category: ExamCategory, subjectId: string) => {
+  const handleNavigateToGenerator = (category: ExamCategory, subjectId?: string) => {
     setGeneratorCategory(category);
-    setGeneratorSubjectId(subjectId);
+    if (subjectId) {
+      setGeneratorSubjectId(subjectId);
+    }
     setActiveCategory(category);
     handleTabChange('generator');
   };
@@ -242,7 +258,7 @@ export default function App() {
     StorageService.saveChatMessages([...currentMessages, userMsg]);
   };
 
-  // 8. LOADING AUTHENTICATION STATE: Smooth splash screen preventing UI flicker
+  // LOADING AUTHENTICATION STATE: Smooth splash screen preventing UI flicker
   if (isAuthChecking) {
     return (
       <div className="min-h-screen w-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white select-none font-sans">
@@ -263,17 +279,15 @@ export default function App() {
     );
   }
 
-  // 1 & 3. PROTECTED ROUTE / AUTHENTICATION GUARD:
-  // If user is not authenticated, show the Login Page immediately.
-  // Forbidden to render or access internal screens!
+  // PROTECTED ROUTE / AUTHENTICATION GUARD
   if (!isLoggedIn) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // 6. MAIN APPLICATION LAYOUT (AFTER SUCCESSFUL AUTHENTICATION)
+  // MAIN APPLICATION LAYOUT (MATCHING SCREENSHOT)
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans selection:bg-blue-600 selection:text-white">
-      {/* Left Sidebar: 7 Navigation Items in strict order */}
+    <div className="flex h-screen bg-[#F8FAFC] text-slate-900 overflow-hidden font-sans selection:bg-blue-600 selection:text-white">
+      {/* Left Sidebar (Matching Screenshot with 7 Items + Logout) */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={handleTabChange}
@@ -286,7 +300,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-        {/* Top Header */}
+        {/* Top Header Navbar (Matching Screenshot with Notification Bell & User Dropdown) */}
         <Navbar
           currentTab={currentTab}
           onSelectTab={handleTabChange}
@@ -302,66 +316,98 @@ export default function App() {
           readinessPercentage={readinessPercentage}
         />
 
-        {/* Dynamic Protected Body Content (Strictly Rendered According to NavTab) */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {/* 1. Chatbot (Main App Screen) */}
-          {currentTab === 'chatbot' && (
-            <ChatTutor
-              user={user}
-              onNavigateToGenerator={handleNavigateToGeneratorFromChat}
-              onNavigateToAnalytics={() => handleTabChange('dashboard')}
-            />
-          )}
+        {/* Dynamic Body Content with smooth route transitions */}
+        <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full"
+            >
+              {/* 1. หน้าหลัก (Home Dashboard - Main UI from Screenshot) */}
+              {currentTab === 'home' && (
+                <HomeDashboard
+                  user={user}
+                  history={history}
+                  onNavigate={handleTabChange}
+                  onSelectCategoryForGenerator={handleNavigateToGenerator}
+                  onRetakeExam={handleRetakeFromHistory}
+                />
+              )}
 
-          {/* 2. สร้างข้อสอบด้วย AI */}
-          {currentTab === 'generator' && (
-            <ExamGenerator
-              onStartExam={handleStartExam}
-              initialCategory={generatorCategory}
-              initialSubjectId={generatorSubjectId}
-            />
-          )}
+              {/* 2. AI ติวเตอร์ (แชทบอท) */}
+              {currentTab === 'chatbot' && (
+                <ChatTutor
+                  user={user}
+                  onNavigateToGenerator={handleNavigateToGenerator}
+                  onNavigateToAnalytics={() => handleTabChange('analytics')}
+                />
+              )}
 
-          {/* 3. Dashboard */}
-          {currentTab === 'dashboard' && (
-            <AnalyticsDashboard
-              user={user}
-              history={history}
-              onNavigateToGenerator={() => handleTabChange('generator')}
-            />
-          )}
+              {/* 3. สร้างข้อสอบ */}
+              {currentTab === 'generator' && (
+                <ExamGenerator
+                  onStartExam={handleStartExam}
+                  initialCategory={generatorCategory}
+                  initialSubjectId={generatorSubjectId}
+                />
+              )}
 
-          {/* 4. ประวัติข้อสอบ */}
-          {currentTab === 'history' && (
-            <ExamHistory
-              history={history}
-              onRetakeExam={handleRetakeFromHistory}
-              onAskAIAboutQuestion={handleAskAIAboutQuestion}
-            />
-          )}
+              {/* 4. ประวัติข้อสอบ */}
+              {currentTab === 'history' && (
+                <ExamHistory
+                  history={history}
+                  onRetakeExam={handleRetakeFromHistory}
+                  onAskAIAboutQuestion={handleAskAIAboutQuestion}
+                  onNavigateToGenerator={() => handleTabChange('generator')}
+                  onRefreshHistory={() => setHistory(StorageService.getExamHistory())}
+                />
+              )}
 
-          {/* 5. โปรไฟล์ */}
-          {currentTab === 'profile' && (
-            <ProfileView
-              user={user}
-              onUpdateProfile={handleUpdateProfile}
-              onLogout={handleLogout}
-            />
-          )}
+              {/* 5. วิธีการใช้งาน */}
+              {currentTab === 'guide' && (
+                <UserGuideView onNavigate={handleTabChange} />
+              )}
 
-          {/* 6. วิธีการใช้งาน */}
-          {currentTab === 'guide' && (
-            <UserGuideView onNavigate={handleTabChange} />
-          )}
+              {/* 6. สถิติการเรียน */}
+              {currentTab === 'analytics' && (
+                <AnalyticsDashboard
+                  user={user}
+                  history={history}
+                  onNavigateToGenerator={() => handleTabChange('generator')}
+                />
+              )}
 
-          {/* 7. บัญชีผู้ใช้งาน */}
-          {currentTab === 'account' && (
-            <AccountView user={user} onLogout={handleLogout} />
-          )}
+              {/* 7. มินิเกม (อยู่ข้างล่างสถิติการเรียน) */}
+              {currentTab === 'minigame' && (
+                <MiniGameView />
+              )}
+
+              {/* 8. ตั้งค่า */}
+              {currentTab === 'settings' && (
+                <SettingsView
+                  user={user}
+                  onUpdateProfile={handleUpdateProfile}
+                  onLogout={handleLogout}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 
-      {/* CBT Exam Modal */}
+      {/* AI Pixel Art Companion for stress relief and learning encouragement (disabled in mini-games) */}
+      {currentTab !== 'minigame' && (
+        <PixelCompanion
+          currentTab={currentTab}
+          onNavigateToMiniGame={() => handleTabChange('minigame')}
+        />
+      )}
+
+      {/* CBT Exam Taking Modal */}
       {activeExam && (
         <ExamTakingModal
           exam={activeExam}

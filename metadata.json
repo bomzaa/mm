@@ -1,6 +1,6 @@
 {
   "name": "AI Exam Coach - เตรียมสอบ TGAT, TPAT, A-Level, O-NET",
-  "description": "ระบบ AI ผู้ช่วยเตรียมสอบ TGAT, TPAT, A-Level, O-NET และข้อสอบโรงเรียน พร้อมระบบจำลองข้อสอบ วิเคราะห์จุดแข็งจุดอ่อน สนทนาติวเข้ม และเก็บบันทึกประวัติการสอบ",
+  "description": "ระบบ AI ผู้ช่วยเตรียมสอบ ป.1 - ม.6 แยกหลักสูตรรายระดับชั้นเด็ดขาด พร้อมระบบจำลองข้อสอบ TGAT, TPAT, A-Level, O-NET วิเคราะห์จุดแข็งจุดอ่อน และติวเข้มรายบทเรียน",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

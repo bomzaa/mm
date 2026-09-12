@@ -215,9 +215,13 @@ export const SAMPLE_EXAMS: ExamData[] = [
   {
     id: 'sample-tgat1-01',
     title: 'TGAT1 Mini Mock Test: Speaking & Situational English',
+    gradeLevel: 'ม.6',
+    subjectCategory: 'เตรียมสอบ',
+    subject: 'TGAT (ความถนัดทั่วไป 1, 2, 3)',
+    lesson: 'TGAT1 การสื่อสารภาษาอังกฤษ (91)',
+    topic: 'ทักษะการพูด (Speaking Skill)',
+    subtopic: 'Short Conversations',
     category: 'TGAT',
-    subject: 'TGAT1 การสื่อสารภาษาอังกฤษ',
-    topic: 'Short Conversations & Situations',
     difficulty: 'ปานกลาง',
     description: 'ชุดข้อสอบจำลอง TGAT1 เน้นทักษะการสื่อสารในชีวิตประจำวันตามแนว Test Blueprint ทปอ.',
     timeLimitMinutes: 10,
@@ -225,6 +229,12 @@ export const SAMPLE_EXAMS: ExamData[] = [
     questions: [
       {
         id: 'sq1',
+        gradeLevel: 'ม.6',
+        subjectCategory: 'เตรียมสอบ',
+        subject: 'TGAT (ความถนัดทั่วไป 1, 2, 3)',
+        lesson: 'TGAT1 การสื่อสารภาษาอังกฤษ (91)',
+        topic: 'ทักษะการพูด (Speaking Skill)',
+        subtopic: 'Conversational English',
         questionText: 'Situation: Pim is having lunch with a coworker who looks very stressed and has not eaten anything.\nPim: "You look overwhelmed today. Is everything okay?"\nCoworker: "I have a massive presentation at 2 PM, and my slides were accidentally deleted."\nPim: "______________. Let me help you reassemble them quickly."',
         options: [
           'A. Never mind, you will fail anyway',
@@ -234,11 +244,16 @@ export const SAMPLE_EXAMS: ExamData[] = [
         ],
         correctOptionIndex: 1,
         explanation: 'ตัวเลือก B ("Take a deep breath and don\'t panic" - หายใจเข้าลึกๆ และอย่าเพิ่งตระหนกไป) เป็นคำตอบที่แสดงความเห็นอกเห็นใจและให้กำลังใจที่เหมาะสมที่สุดกับบริบท ก่อนจะเสนอตัวช่วยเหลือ (Let me help you reassemble them quickly)',
-        subtopic: 'Conversational English',
         difficulty: 'ปานกลาง'
       },
       {
         id: 'sq2',
+        gradeLevel: 'ม.6',
+        subjectCategory: 'เตรียมสอบ',
+        subject: 'TGAT (ความถนัดทั่วไป 1, 2, 3)',
+        lesson: 'TGAT1 การสื่อสารภาษาอังกฤษ (91)',
+        topic: 'ทักษะการอ่าน (Reading Skill)',
+        subtopic: 'Grammar & Error Identification',
         questionText: 'Which sentence contains a GRAMMATICAL ERROR?\n\n(1) Neither the teacher nor the students (2) was aware that the examination room (3) had been changed (4) to the third floor.',
         options: [
           '(1) Neither the teacher nor the students',
@@ -248,11 +263,16 @@ export const SAMPLE_EXAMS: ExamData[] = [
         ],
         correctOptionIndex: 1,
         explanation: 'ข้อผิดพลาดอยู่ที่ส่วนที่ (2) เพราะตามกฎ Subject-Verb Agreement สำหรับ "Neither... nor..." กริยาจะต้องผันตามประธานตัวหลัง คือ "the students" (พหูพจน์) ดังนั้นจึงต้องแก้จาก "was aware" เป็น "were aware"',
-        subtopic: 'Grammar & Error Identification',
         difficulty: 'ปานกลาง'
       },
       {
         id: 'sq3',
+        gradeLevel: 'ม.6',
+        subjectCategory: 'เตรียมสอบ',
+        subject: 'TGAT (ความถนัดทั่วไป 1, 2, 3)',
+        lesson: 'TGAT1 การสื่อสารภาษาอังกฤษ (91)',
+        topic: 'ทักษะการอ่าน (Reading Skill)',
+        subtopic: 'Reading Comprehension',
         questionText: 'Reading Passage:\n"Artificial intelligence tools in education are designed to complement, not replace, human educators. By handling repetitive grading tasks and generating adaptive practice problems, AI allows teachers to devote more time to mentoring and fostering critical thinking."\n\nAccording to the passage, what is the primary benefit of AI in classrooms?',
         options: [
           'A. Replacing human teachers entirely to cut costs',
@@ -262,7 +282,6 @@ export const SAMPLE_EXAMS: ExamData[] = [
         ],
         correctOptionIndex: 2,
         explanation: 'passage ระบุชัดเจนว่า AI ช่วยงานซ้ำซ้อนเพื่อให้ครูมีเวลาไปทำ "mentoring and fostering critical thinking" (การให้คำปรึกษาและส่งเสริมการคิดวิเคราะห์)',
-        subtopic: 'Reading Comprehension',
         difficulty: 'ง่าย'
       }
     ]
@@ -270,9 +289,13 @@ export const SAMPLE_EXAMS: ExamData[] = [
   {
     id: 'sample-tgat2-01',
     title: 'TGAT2 ชุดจำลอง: ตรรกะและอนุกรมตัวเลข',
+    gradeLevel: 'ม.6',
+    subjectCategory: 'เตรียมสอบ',
+    subject: 'TGAT (ความถนัดทั่วไป 1, 2, 3)',
+    lesson: 'TGAT2 การคิดอย่างมีเหตุผล (92)',
+    topic: 'ความสามารถทางจำนวน',
+    subtopic: 'อนุกรมและการคิดเชิงตรรกะ',
     category: 'TGAT',
-    subject: 'TGAT2 การคิดอย่างมีเหตุผล',
-    topic: 'อนุกรมและการคิดเชิงตรรกะ',
     difficulty: 'ปานกลาง',
     description: 'ฝึกกระบวนการคิดวิเคราะห์เชิงตัวเลขและตรรกศาสตร์ สอดคล้องกับข้อสอบ 92',
     timeLimitMinutes: 10,
@@ -280,6 +303,12 @@ export const SAMPLE_EXAMS: ExamData[] = [
     questions: [
       {
         id: 'sq2_1',
+        gradeLevel: 'ม.6',
+        subjectCategory: 'เตรียมสอบ',
+        subject: 'TGAT (ความถนัดทั่วไป 1, 2, 3)',
+        lesson: 'TGAT2 การคิดอย่างมีเหตุผล (92)',
+        topic: 'ความสามารถทางจำนวน',
+        subtopic: 'อนุกรมตัวเลข',
         questionText: 'จงหาจำนวนถัดไปของอนุกรม: 3, 7, 15, 31, 63, ...',
         options: [
           'ก. 125',
@@ -290,11 +319,16 @@ export const SAMPLE_EXAMS: ExamData[] = [
         ],
         correctOptionIndex: 1,
         explanation: 'รูปแบบของอนุกรมคือ การคูณ 2 แล้วบวก 1 หรือ ผลต่างเพิ่มขึ้นเป็น 2 เท่า:\n3 (+4) -> 7 (+8) -> 15 (+16) -> 31 (+32) -> 63 (+64) = 127\nสูตรลัด: 2^(n+1) - 1 สำหรับพจน์ที่ 6 คือ 2^7 - 1 = 128 - 1 = 127',
-        subtopic: 'อนุกรมตัวเลข',
         difficulty: 'ปานกลาง'
       },
       {
         id: 'sq2_2',
+        gradeLevel: 'ม.6',
+        subjectCategory: 'เตรียมสอบ',
+        subject: 'TGAT (ความถนัดทั่วไป 1, 2, 3)',
+        lesson: 'TGAT2 การคิดอย่างมีเหตุผล (92)',
+        topic: 'ความสามารถทางภาษาและเหตุผล',
+        subtopic: 'การคิดเชิงเหตุผล (Logical Deduction)',
         questionText: 'กำหนดให้:\n1. นักเรียนทุกคนที่สอบผ่าน TGAT จะต้องอ่านหนังสืออย่างน้อยวันละ 2 ชั่วโมง\n2. ภัทรไม่อ่านหนังสือเลยในสัปดาห์นี้\nข้อสรุปใดต่อไปนี้ "สมเหตุสมผลตามหลักตรรกศาสตร์ที่สุด"?',
         options: [
           'ก. ภัทรจะสอบผ่าน TGAT ได้อย่างแน่นอน',
@@ -305,8 +339,84 @@ export const SAMPLE_EXAMS: ExamData[] = [
         ],
         correctOptionIndex: 1,
         explanation: 'ตามตรรกศาสตร์: ถ้า P แล้ว Q (ถ้าสอบผ่าน TGAT -> ต้องอ่าน >= 2 ชม.)\nแย้งสลับที่ (Contrapositive): ถ้าไม่ใช่ Q (ไม่อ่าน) -> ย่อมไม่ใช่ P (สอบไม่ผ่าน TGAT)\nดังนั้น ภัทรไม่อ่านหนังสือ จึงสรุปได้ว่าภัทรจะสอบไม่ผ่าน TGAT',
-        subtopic: 'การคิดเชิงเหตุผล (Logical Deduction)',
         difficulty: 'ปานกลาง'
+      }
+    ]
+  },
+  {
+    id: 'sample-alevel-math1-01',
+    title: 'A-Level 61 คณิตศาสตร์ประยุกต์ 1 (ตรีโกณมิติ, แคลคูลัส & เวกเตอร์)',
+    gradeLevel: 'ม.6',
+    subjectCategory: 'เตรียมสอบ',
+    subject: 'A-Level (วิชาสามัญ)',
+    lesson: 'A-Level 61 คณิตศาสตร์ประยุกต์ 1',
+    topic: 'ฟังก์ชันตรีโกณมิติและแคลคูลัส',
+    subtopic: 'ตรีโกณมิติ แคลคูลัส และเรขาคณิต',
+    category: 'A-Level',
+    difficulty: 'ยาก',
+    description: 'ชุดข้อสอบจำลองคณิตศาสตร์ประยุกต์ 1 เสริมทักษะการคำนวณและวิเคราะห์สัญลักษณ์คณิตศาสตร์ขั้นสูง',
+    timeLimitMinutes: 15,
+    createdAt: new Date().toISOString(),
+    questions: [
+      {
+        id: 'alevel_m1_q1',
+        gradeLevel: 'ม.6',
+        subjectCategory: 'เตรียมสอบ',
+        subject: 'A-Level (วิชาสามัญ)',
+        lesson: 'ฟังก์ชันตรีโกณมิติ',
+        topic: 'เอกลักษณ์ตรีโกณมิติ',
+        subtopic: 'มุมและการแปลงค่า',
+        questionText: 'กำหนดให้ $0 < \\theta < \\frac{\\pi}{2}$ และ $\\cos \\theta = \\frac{4}{5}$ จงหาค่าของ $\\sin(2\\theta) + \\tan \\theta$',
+        options: [
+          '$\\frac{123}{100}$',
+          '$\\frac{171}{100}$',
+          '$\\frac{7}{5}$',
+          '$\\frac{24}{25}$',
+          '$\\frac{9}{10}$'
+        ],
+        correctOptionIndex: 1,
+        explanation: '### วิธีทำอย่างละเอียด:\n1. จาก $0 < \\theta < \\frac{\\pi}{2}$ และ $\\cos \\theta = \\frac{4}{5}$\n   จะได้ $\\sin \\theta = \\sqrt{1 - \\cos^2 \\theta} = \\sqrt{1 - \\frac{16}{25}} = \\frac{3}{5}$\n2. และ $\\tan \\theta = \\frac{\\sin \\theta}{\\cos \\theta} = \\frac{3/5}{4/5} = \\frac{3}{4}$\n3. คำนวณ $\\sin(2\\theta) = 2\\sin\\theta\\cos\\theta = 2\\left(\\frac{3}{5}\\right)\\left(\\frac{4}{5}\\right) = \\frac{24}{25}$\n4. ดังนั้น $\\sin(2\\theta) + \\tan\\theta = \\frac{24}{25} + \\frac{3}{4} = \\frac{96 + 75}{100} = \\frac{171}{100}$ (เลือกตัวเลือกที่ 2)',
+        difficulty: 'ยาก'
+      },
+      {
+        id: 'alevel_m1_q2',
+        gradeLevel: 'ม.6',
+        subjectCategory: 'เตรียมสอบ',
+        subject: 'A-Level (วิชาสามัญ)',
+        lesson: 'แคลคูลัสเบื้องต้น',
+        topic: 'การอินทิเกรตจำกัดเขต',
+        subtopic: 'พื้นที่ใต้กราฟ',
+        questionText: 'จงหาค่าของอินทิกรัลจำกัดเขต $\\int_0^3 (x^2 - 2x + 4)\\,dx$',
+        options: [
+          '$12$',
+          '$15$',
+          '$18$',
+          '$21$',
+          '$24$'
+        ],
+        correctOptionIndex: 0,
+        explanation: '### วิธีทำอย่างละเอียด:\n1. หาปฏิยานุพันธ์:\n   $$\\int (x^2 - 2x + 4)\\,dx = \\left[ \\frac{x^3}{3} - x^2 + 4x \\right]_0^3$$\n2. แทนค่าขอบเขตบน ($x = 3$) และขอบเขตล่าง ($x = 0$):\n   $$= \\left( \\frac{3^3}{3} - (3)^2 + 4(3) \\right) - (0) = (9 - 9 + 12) - 0 = 12$$\n3. ดังนั้นคำตอบคือ $12$ (เลือกตัวเลือกที่ 1)',
+        difficulty: 'ปานกลาง'
+      },
+      {
+        id: 'alevel_m1_q3',
+        gradeLevel: 'ม.6',
+        subjectCategory: 'เตรียมสอบ',
+        subject: 'A-Level (วิชาสามัญ)',
+        lesson: 'เรขาคณิตและเวกเตอร์',
+        topic: 'มุมและความสัมพันธ์ตั้งฉาก',
+        subtopic: 'การตั้งฉากและขนาน',
+        questionText: 'กำหนดสามเหลี่ยมมุมฉาก $ABC$ มี $\\angle ABC = 90^\\circ$ ด้าน $AB \\perp BC$ โดยมีความยาวด้าน $AB = 5\\text{ ซม.}$ และ $BC = 12\\text{ ซม.}$ จงหาความยาวของด้านตรงข้ามมุมฉาก $AC$',
+        options: [
+          '$13\\text{ ซม.}$',
+          '$\\sqrt{119}\\text{ ซม.}$',
+          '$17\\text{ ซม.}$',
+          '$15\\text{ ซม.}$',
+          '$\\sqrt{39}\\text{ ซม.}$'
+        ],
+        correctOptionIndex: 0,
+        explanation: '### วิธีทำอย่างละเอียด:\n1. ใช้ทฤษฎีบทพีทาโกรัสสำหรับสามเหลี่ยมมุมฉาก $ABC$:\n   $$AC^2 = AB^2 + BC^2$$\n2. แทนค่า $AB = 5$ และ $BC = 12$:\n   $$AC^2 = 5^2 + 12^2 = 25 + 144 = 169$$\n3. ถอดรากที่สอง:\n   $$AC = \\sqrt{169} = 13\\text{ ซม.}$$\n4. ดังนั้นความยาวด้าน $AC = 13\\text{ ซม.}$ (เลือกตัวเลือกที่ 1)',
+        difficulty: 'ง่าย'
       }
     ]
   }

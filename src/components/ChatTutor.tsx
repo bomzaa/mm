@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'motion/react';
 import {
   Send,
   Sparkles,
@@ -8,32 +9,36 @@ import {
   VolumeX,
   Copy,
   Check,
-  RotateCcw,
+  Trash2,
   BookOpen,
   HelpCircle,
-  Lightbulb,
-  Zap,
-  Target,
-  BrainCircuit,
-  MessageSquare,
   BarChart2,
+  Lightbulb,
+  Image as ImageIcon,
+  X,
+  Loader2,
+  GraduationCap,
+  BrainCircuit,
+  Zap,
   ArrowRight,
-  TrendingUp,
-  Clock,
-  Flame,
-  CheckCircle2,
+  RefreshCw,
+  RotateCcw,
+  MessageSquarePlus,
+  AlertTriangle,
 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { MathRenderer } from './MathRenderer';
 import { ChatMessage, ExamCategory, UserProfile } from '../types';
-import { EXAM_SUBJECTS } from '../data/examCatalog';
 import { StorageService } from '../lib/storage';
 import { FirestoreService } from '../lib/firestoreService';
+import { formatMathToSpeechText, formatHumanReadableText } from '../utils/examFormatter';
 
 interface ChatTutorProps {
   user: UserProfile;
   onNavigateToGenerator?: (category: ExamCategory, subjectId: string) => void;
   onNavigateToAnalytics?: () => void;
 }
+
+export type TutorMode = 'socratic' | 'comprehensive' | 'quick_solution';
 
 export const ChatTutor: React.FC<ChatTutorProps> = ({
   user,
@@ -42,28 +47,62 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>(() => StorageService.getChatMessages());
   const [inputText, setInputText] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<ExamCategory>('TGAT');
-  const [selectedSubject, setSelectedSubject] = useState<string>('tgat1');
-  const [mode, setMode] = useState<string>('ติวเตอร์เจาะลึก (Step-by-Step)');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [tutorMode, setTutorMode] = useState<TutorMode>('socratic');
+
+  // Image upload attachment state
+  const [selectedImage, setSelectedImage] = useState<{
+    file: File;
+    previewUrl: string;
+    base64Data: string;
+    mimeType: string;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const filteredSubjects = EXAM_SUBJECTS.filter((s) => s.category === selectedCategory);
-  const currentSubjectObj =
-    EXAM_SUBJECTS.find((s) => s.id === selectedSubject) || filteredSubjects[0] || EXAM_SUBJECTS[0];
-
+  // Auto-scroll on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  // Sync to local storage
   useEffect(() => {
     StorageService.saveChatMessages(messages);
   }, [messages]);
 
-  // Handle TTS
+  // Auto resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [inputText]);
+
+  // Handle Image Selection
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64Data = result.split(',')[1];
+      setSelectedImage({
+        file,
+        previewUrl: result,
+        base64Data,
+        mimeType: file.type || 'image/jpeg',
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Handle TTS Text-to-Speech
   const handleSpeak = (id: string, text: string) => {
     if (!('speechSynthesis' in window)) {
       alert('เบราว์เซอร์นี้ยังไม่รองรับระบบอ่านออกเสียง');
@@ -77,7 +116,7 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({
     }
 
     window.speechSynthesis.cancel();
-    const cleanText = text.replace(/[*_#`[\]()]/g, '');
+    const cleanText = formatMathToSpeechText(text);
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'th-TH';
     utterance.rate = 1.05;
@@ -89,74 +128,128 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({
     window.speechSynthesis.speak(utterance);
   };
 
+  // Handle Copy text
   const handleCopy = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
+    const readable = formatHumanReadableText(text);
+    navigator.clipboard.writeText(readable);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleSendMessage = async (textToSend?: string) => {
-    const query = (textToSend || inputText).trim();
-    if (!query || isLoading) return;
+  // Internal API caller with single automatic retry
+  const callChatApi = async (pastMessagesToSend: any[], currentImage?: any) => {
+    const examHistory = StorageService.getExamHistory();
+    const recentAttempts = examHistory.slice(0, 3).map((h) => ({
+      subject: h.subject,
+      title: h.title,
+      score: h.score,
+      totalQuestions: h.totalQuestions,
+      percentage: h.percentage,
+    }));
 
-    const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: query,
-      timestamp: new Date().toISOString(),
-      category: selectedCategory,
-      subject: currentSubjectObj?.name,
+    const requestBody = {
+      messages: pastMessagesToSend,
+      tutorMode,
+      gradeLevel: user.gradeLevel,
+      userGoal: {
+        name: user.name,
+        gradeLevel: user.gradeLevel,
+        dreamFaculty: user.dreamFaculty,
+        dreamUniversity: user.dreamUniversity,
+        targetExam: user.targetExam,
+      },
+      recentExamHistory: recentAttempts,
+      image: currentImage
+        ? {
+            mimeType: currentImage.mimeType,
+            data: currentImage.base64Data,
+          }
+        : undefined,
     };
 
-    const updatedHistory = [...messages, userMsg];
-    setMessages(updatedHistory);
-    setInputText('');
-    setIsLoading(true);
-    FirestoreService.saveChatMessage(userMsg).catch((err) =>
-      console.warn('Chat firestore save notice:', err)
-    );
+    let response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
 
-    try {
-      const response = await fetch('/api/chat', {
+    // Auto-retry once on 5xx or network hiccups
+    if (!response.ok && response.status >= 500) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: updatedHistory.slice(-10).map((m) => ({ role: m.role, content: m.content })),
-          category: selectedCategory,
-          subject: currentSubjectObj?.name,
-          userGoal: {
-            gradeLevel: user.gradeLevel,
-            dreamFaculty: user.dreamFaculty,
-            dreamUniversity: user.dreamUniversity,
-          },
-          mode,
-        }),
+        body: JSON.stringify(requestBody),
       });
+    }
 
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
-      }
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}`);
+    }
 
-      const data = await response.json();
-      const replyText = data.reply || 'ขออภัย ไม่สามารถสร้างคำตอบได้';
+    return await response.json();
+  };
 
-      const defaultSuggestions = [
-        `ขอโจทย์ฝึกทำเรื่องนี้ 1 ข้อ (${currentSubjectObj?.name || 'TGAT'})`,
-        `สรุปเทคนิคจำและจุดหลอกบ่อยๆ`,
-        `ข้อนี้ออกสอบบ่อยแค่ไหนใน TCAS?`,
-      ];
+  // Handle Send Message (Multi-turn with memory & error resilience)
+  const handleSendMessage = async (textToSend?: string, isRetry = false) => {
+    const query = (textToSend !== undefined ? textToSend : inputText).trim();
+    if ((!query && !selectedImage) || isLoading) return;
+
+    const currentImage = selectedImage;
+
+    let updatedHistory = [...messages];
+
+    // If this is a direct user message (not a retry of an existing message), add it
+    if (!isRetry) {
+      const userMsg: ChatMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: query || (currentImage ? 'ช่วยวิเคราะห์และอธิบายโจทย์ในรูปภาพนี้อย่างละเอียดให้หน่อยครับ' : ''),
+        timestamp: new Date().toISOString(),
+      };
+      updatedHistory = [...messages, userMsg];
+      setMessages(updatedHistory);
+      setInputText('');
+      setSelectedImage(null);
+
+      FirestoreService.saveChatMessage(userMsg).catch((err) =>
+        console.warn('Chat firestore save notice:', err)
+      );
+    } else {
+      // If retrying, remove the previous error message if present
+      updatedHistory = updatedHistory.filter((m) => !m.isError);
+      setMessages(updatedHistory);
+    }
+
+    setIsLoading(true);
+
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+
+    try {
+      // Filter out any previous error messages when sending history to AI
+      const cleanHistory = updatedHistory.filter((m) => !m.isError && m.content.trim().length > 0);
+      const pastMessagesToSend = cleanHistory.slice(-20).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const data = await callChatApi(pastMessagesToSend, currentImage);
+      const replyText = data.reply || 'ขออภัย ไม่สามารถสร้างคำตอบได้ในขณะนี้';
+      const suggestedQuestions = Array.isArray(data.suggestedQuestions)
+        ? data.suggestedQuestions
+        : [];
 
       const modelMsg: ChatMessage = {
         id: `model-${Date.now()}`,
         role: 'model',
         content: replyText,
+        suggestedQuestions: suggestedQuestions.length > 0 ? suggestedQuestions : undefined,
         timestamp: new Date().toISOString(),
-        category: selectedCategory,
-        subject: currentSubjectObj?.name,
-        suggestedQuestions: defaultSuggestions,
       };
 
-      setMessages((prev) => [...prev, modelMsg]);
+      setMessages((prev) => [...prev.filter((m) => !m.isError), modelMsg]);
       FirestoreService.saveChatMessage(modelMsg).catch((err) =>
         console.warn('Chat firestore save notice:', err)
       );
@@ -165,7 +258,9 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({
       const errorMsg: ChatMessage = {
         id: `model-err-${Date.now()}`,
         role: 'model',
-        content: `⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI Tutor (${error.message || 'โปรดลองอีกครั้ง'})\n\nคำแนะนำ: คุณสามารถลองกดส่งคำถามซ้ำ หรือเปลี่ยนหัวข้อคำถามใหม่ครับ`,
+        content: `⚠️ ระบบ AI ขัดข้องชั่วคราว กรุณาลองส่งข้อความอีกครั้ง (${error.message || 'Network error'})`,
+        isError: true,
+        retryPrompt: query,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -174,410 +269,466 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({
     }
   };
 
+  // Handle Retry a failed turn
+  const handleRetryFailed = (failedMsg: ChatMessage) => {
+    if (isLoading) return;
+    const promptToRetry = failedMsg.retryPrompt || '';
+    handleSendMessage(promptToRetry, true);
+  };
+
+  // Handle Start New Conversation (Instant Reset without blocking iframe window.confirm)
   const handleClearChat = () => {
-    if (confirm('คุณต้องการล้างประวัติการสนทนานี้หรือไม่?')) {
-      const resetMsg: ChatMessage[] = [
-        {
-          id: `welcome-${Date.now()}`,
-          role: 'model',
-          content: `เริ่มการสนทนาใหม่แล้วครับ! มีเรื่องไหนใน **${currentSubjectObj?.name || 'TGAT'}** ที่อยากให้ผมช่วยติวหรือยกตัวอย่างโจทย์ให้ดูไหมครับ?`,
-          timestamp: new Date().toISOString(),
-          suggestedQuestions: [
-            'สรุปสูตรและจุดสำคัญที่ต้องจำ',
-            'ขอโจทย์ตัวอย่างพร้อมวิธีคิดทีละสเต็ป',
-            'เทคนิคตัดช้อยส์เมื่อเวลาจะหมด',
-          ],
-        },
-      ];
-      setMessages(resetMsg);
-      StorageService.saveChatMessages(resetMsg);
+    const resetMsg: ChatMessage = {
+      id: `welcome-${Date.now()}`,
+      role: 'model',
+      content: `สวัสดีครับคุณ **${user.name || 'เพื่อนนักเรียน'}**! 🚀 ผมคือ **AI Study Buddy** ผู้ช่วยติวและเรียนรู้ส่วนตัวของคุณ\n\nพร้อมช่วยเหลือทั้งการติวเนื้อหา สรุปบทเรียน ช่วยแนะแนววิธีคิดโจทย์ทีละขั้นตอน หรือวิเคราะห์จุดที่ยังสงสัย ถามต่อเนื่องได้เลยครับ!`,
+      timestamp: new Date().toISOString(),
+      suggestedQuestions: [
+        'ช่วยสอนตรีโกณมิติพื้นฐานหน่อย',
+        'ฟิสิกส์เรื่องการเคลื่อนที่แนวตรงใช้สูตรอะไรบ้าง?',
+        'แนะนำเทคนิคจำศัพท์ภาษาอังกฤษ TGAT1',
+        'ช่วยติวเรื่องสมดุลเคมีทีละสเต็ป',
+      ],
+    };
+    setMessages([resetMsg]);
+    setInputText('');
+    setSelectedImage(null);
+    StorageService.saveChatMessages([resetMsg]);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.focus();
+    }
+  };
+
+  const formatMessageTime = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleTimeString('th-TH', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '';
     }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-6.5rem)] pb-2 overflow-hidden max-w-7xl mx-auto w-full">
-      {/* Left Chat Window (8 Columns) */}
-      <div className="lg:col-span-8 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden h-full">
-        {/* Chat Header Bar */}
-        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2">
-          {/* Category & Subject Selectors */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
-              {(['TGAT', 'TPAT', 'A-Level', 'O-NET'] as ExamCategory[]).map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => {
-                    setSelectedCategory(cat);
-                    const firstSub = EXAM_SUBJECTS.find((s) => s.category === cat);
-                    if (firstSub) setSelectedSubject(firstSub.id);
-                  }}
-                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                    selectedCategory === cat
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+    <div className="max-w-5xl mx-auto space-y-4 pb-4 animate-in fade-in duration-300 font-sans">
+      {/* 1. TOP HEADER CARD */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          {/* Blue Vertical Accent Pill */}
+          <div className="w-1.5 h-8 bg-blue-600 rounded-full shrink-0" />
 
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="text-xs font-semibold bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800 focus:ring-2 focus:ring-indigo-500 max-w-[170px] truncate"
-            >
-              {filteredSubjects.map((sub) => (
-                <option key={sub.id} value={sub.id}>
-                  {sub.name}
-                </option>
-              ))}
-            </select>
+          {/* Blue Square Bot Icon */}
+          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+            <Bot className="w-5 h-5" />
           </div>
 
-          {/* Mode Selector & Actions */}
-          <div className="flex items-center gap-2">
-            <select
-              value={mode}
-              onChange={(e) => setMode(e.target.value)}
-              className="text-xs font-medium bg-white border border-slate-200 text-slate-700 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-indigo-500 hidden sm:block"
-            >
-              <option value="ติวเตอร์เจาะลึก (Step-by-Step)">🎯 ติวเตอร์เจาะลึก</option>
-              <option value="สรุปสูตร & เทคนิคโกงเวลา">⚡ สรุปสูตรลัด</option>
-              <option value="ฝึกทำโจทย์ & ตะลุยข้อสอบ">📝 ตะลุยข้อสอบ</option>
-            </select>
-
-            <button
-              onClick={handleClearChat}
-              title="ล้างการสนทนา"
-              aria-label="ล้างการสนทนา"
-              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+          {/* Text Title & Subtitle */}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
+                AI Study Buddy (ติวเตอร์ส่วนตัวอัจฉริยะ)
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                จดจำบริบทต่อเนื่อง
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5 truncate">
+              ติวเตอร์ระดับชั้น {user.gradeLevel || 'มัธยมศึกษา'} • ถาม-ตอบต่อเนื่องได้ ไม่ต้องพิมพ์โจทย์ซ้ำ
+            </p>
           </div>
         </div>
 
-        {/* Chat Messages Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-          {messages.map((msg) => {
+        {/* Right side: Tutor Mode Selector & New Chat Button */}
+        <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+          {/* Tutor Mode Switcher */}
+          <div className="flex items-center bg-slate-100/90 p-1 rounded-xl text-xs font-semibold">
+            <button
+              onClick={() => setTutorMode('socratic')}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                tutorMode === 'socratic'
+                  ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="โหมดชวนคิด: อธิบายทีละสเต็ป ไม่เฉลยทันที ถามตรวจความเข้าใจ"
+            >
+              <BrainCircuit className="w-3.5 h-3.5" />
+              <span>โหมดชวนคิด</span>
+            </button>
+
+            <button
+              onClick={() => setTutorMode('comprehensive')}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                tutorMode === 'comprehensive'
+                  ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="โหมดละเอียด: สรุปเนื้อหาพร้อมสูตรและตัวอย่าง"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>อธิบายละเอียด</span>
+            </button>
+
+            <button
+              onClick={() => setTutorMode('quick_solution')}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                tutorMode === 'quick_solution'
+                  ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="โหมดเฉลยไว: คำตอบตรงจุดและวิธีลัด"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>เฉลยไว</span>
+            </button>
+          </div>
+
+          {/* Start New Conversation Button */}
+          <button
+            id="btn-clear-chat"
+            onClick={handleClearChat}
+            className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-blue-600 hover:bg-blue-50 active:scale-95 border border-slate-200/80 px-2.5 py-1.5 rounded-xl transition-all font-semibold cursor-pointer shadow-2xs select-none"
+            title="เริ่มบทสนทนาใหม่ (รีเซ็ตห้องแชต)"
+          >
+            <MessageSquarePlus className="w-3.5 h-3.5 text-blue-600" />
+            <span>เริ่มแชตใหม่</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. MAIN CHAT WINDOW */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-4 sm:p-6 min-h-[480px] sm:min-h-[520px] flex flex-col justify-between overflow-y-auto">
+        <div className="space-y-6 flex-1">
+          {messages.map((msg, msgIdx) => {
             const isUser = msg.role === 'user';
+            const isErrorMsg = msg.isError;
+
             return (
-              <div
+              <motion.div
                 key={msg.id}
+                initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
                 className={`flex items-start gap-3.5 ${isUser ? 'justify-end' : ''}`}
               >
-                {/* Bot Icon */}
+                {/* Bot Icon on Left for AI responses */}
                 {!isUser && (
-                  <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs mt-0.5">
-                    <Bot className="w-4 h-4" />
+                  <div
+                    className={`w-9 h-9 rounded-xl text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5 ${
+                      isErrorMsg
+                        ? 'bg-amber-600'
+                        : 'bg-gradient-to-tr from-blue-700 to-indigo-600'
+                    }`}
+                  >
+                    {isErrorMsg ? <AlertTriangle className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
                   </div>
                 )}
 
-                {/* Message Bubble */}
-                <div className="max-w-[85%] sm:max-w-[80%] space-y-1.5">
+                {/* Message Bubble Body */}
+                <div className={`max-w-[92%] sm:max-w-[82%] space-y-2 ${isUser ? 'text-right' : ''}`}>
                   <div
-                    className={`p-4 text-sm leading-relaxed ${
+                    className={`p-4 sm:p-5 rounded-2xl leading-relaxed text-xs sm:text-sm text-left ${
                       isUser
-                        ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none shadow-xs font-normal'
-                        : 'bg-slate-50 p-4 rounded-2xl rounded-tl-none border border-slate-100 text-slate-700 shadow-2xs'
+                        ? 'bg-blue-600 text-white rounded-tr-none shadow-xs font-normal'
+                        : isErrorMsg
+                        ? 'bg-amber-50 border border-amber-200 text-amber-900 rounded-tl-none shadow-2xs'
+                        : 'bg-slate-50/95 border border-slate-100 text-slate-800 shadow-2xs rounded-tl-none'
                     }`}
                   >
                     {isUser ? (
-                      <p className="whitespace-pre-wrap font-medium">{msg.content}</p>
+                      <div className="text-white whitespace-pre-wrap break-words">
+                        <MathRenderer content={msg.content} className="text-white" />
+                      </div>
                     ) : (
-                      <div className="markdown-body prose prose-sm max-w-none text-slate-800">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <div className="prose prose-sm max-w-none text-inherit break-words">
+                        <MathRenderer content={msg.content} />
+                      </div>
+                    )}
+
+                    {/* Retry Button inside error bubble */}
+                    {isErrorMsg && (
+                      <div className="mt-3 pt-2 border-t border-amber-200/80 flex items-center gap-3">
+                        <button
+                          onClick={() => handleRetryFailed(msg)}
+                          disabled={isLoading}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>ลองใหม่อีกครั้ง (Retry)</span>
+                        </button>
+                        <span className="text-[11px] text-amber-700">ข้อความเดิมของคุณยังคงอยู่ครบ</span>
+                      </div>
+                    )}
+
+                    {/* Time Stamp */}
+                    {msg.timestamp && (
+                      <div
+                        className={`text-[10px] mt-2 text-right font-medium ${
+                          isUser ? 'text-blue-100' : isErrorMsg ? 'text-amber-600/70' : 'text-slate-400'
+                        }`}
+                      >
+                        {formatMessageTime(msg.timestamp)}
                       </div>
                     )}
                   </div>
 
-                  {/* Actions for AI answers */}
-                  {!isUser && (
-                    <div className="flex items-center gap-2 pt-0.5">
-                      <button
-                        onClick={() => handleSpeak(msg.id, msg.content)}
-                        className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border transition-colors ${
-                          speakingId === msg.id
-                            ? 'bg-indigo-100 border-indigo-300 text-indigo-700 font-bold'
-                            : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700'
-                        }`}
-                      >
-                        {speakingId === msg.id ? (
-                          <>
-                            <VolumeX className="w-3 h-3" />
-                            <span>หยุด</span>
-                          </>
-                        ) : (
-                          <>
-                            <Volume2 className="w-3 h-3" />
-                            <span>ฟังเสียง</span>
-                          </>
-                        )}
-                      </button>
+                  {/* Actions for regular AI answers: Read Aloud & Copy */}
+                  {!isUser && !isErrorMsg && (
+                    <div className="flex flex-col gap-2 pt-1">
+                      <div className="flex items-center gap-2 pl-1">
+                        <button
+                          onClick={() => handleSpeak(msg.id, msg.content)}
+                          className={`flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                            speakingId === msg.id
+                              ? 'bg-blue-100 border-blue-300 text-blue-700 font-bold'
+                              : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {speakingId === msg.id ? (
+                            <>
+                              <VolumeX className="w-3 h-3 text-rose-500" />
+                              <span>หยุดอ่าน</span>
+                            </>
+                          ) : (
+                            <>
+                              <Volume2 className="w-3 h-3 text-slate-400" />
+                              <span>ฟังเสียง</span>
+                            </>
+                          )}
+                        </button>
 
-                      <button
-                        onClick={() => handleCopy(msg.id, msg.content)}
-                        className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
-                      >
-                        {copiedId === msg.id ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-600" />
-                            <span className="text-emerald-600 font-bold">คัดลอกแล้ว</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>คัดลอก</span>
-                          </>
-                        )}
-                      </button>
-
-                      <span className="text-[10px] text-slate-400 ml-auto">
-                        {new Date(msg.timestamp).toLocaleTimeString('th-TH', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Follow-up question chips */}
-                  {!isUser && msg.suggestedQuestions && msg.suggestedQuestions.length > 0 && (
-                    <div className="pt-2 space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                        <Lightbulb className="w-3 h-3 text-amber-500" />
-                        <span>ลองถามต่อ:</span>
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {msg.suggestedQuestions.map((q, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => handleSendMessage(q)}
-                            className="text-xs text-left px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 transition-all font-medium cursor-pointer"
-                          >
-                            💬 {q}
-                          </button>
-                        ))}
+                        <button
+                          onClick={() => handleCopy(msg.id, msg.content)}
+                          className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          {copiedId === msg.id ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span className="text-emerald-600 font-bold">คัดลอกแล้ว</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3 text-slate-400" />
+                              <span>คัดลอก</span>
+                            </>
+                          )}
+                        </button>
                       </div>
+
+                      {/* Interactive Suggested Follow-up Questions (Chips for Next Multi-turn) */}
+                      {msg.suggestedQuestions && msg.suggestedQuestions.length > 0 && msgIdx === messages.length - 1 && (
+                        <div className="mt-1 space-y-1.5">
+                          <div className="flex items-center gap-1 text-[11px] text-slate-500 font-semibold pl-1">
+                            <Sparkles className="w-3 h-3 text-amber-500" />
+                            <span>ถามต่อเนื่องจากเรื่องนี้:</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {msg.suggestedQuestions.map((sq, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => handleSendMessage(sq)}
+                                disabled={isLoading}
+                                className="group inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50/70 hover:bg-blue-100/90 text-blue-700 border border-blue-200/80 rounded-xl text-xs font-medium transition-all shadow-2xs hover:scale-[1.01] cursor-pointer text-left active:scale-95"
+                              >
+                                <span className="text-blue-500 font-bold">↳</span>
+                                <span>{sq}</span>
+                                <ArrowRight className="w-3 h-3 text-blue-400 group-hover:translate-x-0.5 transition-transform" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
 
-                {/* User Avatar */}
+                {/* User Avatar on Right */}
                 {isUser && (
-                  <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs mt-0.5">
-                    {user.name.charAt(0) || <User className="w-4 h-4" />}
+                  <div className="w-9 h-9 rounded-xl bg-slate-800 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs mt-0.5">
+                    {user.name ? user.name.charAt(0).toUpperCase() : <User className="w-4 h-4" />}
                   </div>
                 )}
-              </div>
+              </motion.div>
             );
           })}
 
+          {/* Thinking / Loading indicator with Staggered Bouncing Dots */}
           {isLoading && (
-            <div className="flex items-start gap-3.5">
-              <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0 animate-pulse">
-                <Sparkles className="w-4 h-4 text-indigo-600" />
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-start gap-3.5"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+                <Bot className="w-5 h-5" />
               </div>
-              <div className="bg-slate-50 p-4 rounded-2xl rounded-tl-none border border-slate-100 text-slate-700 shadow-2xs space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-indigo-600">
-                  <BrainCircuit className="w-4 h-4 animate-spin" />
-                  <span>AI Tutor กำลังเรียบเรียงคำตอบ...</span>
+              <div className="bg-slate-50/95 border border-slate-100 rounded-2xl rounded-tl-none p-4 text-xs text-slate-600 shadow-2xs space-y-2">
+                <div className="flex items-center gap-2 font-medium text-blue-600">
+                  <div className="flex items-center gap-1">
+                    {[0, 1, 2].map((dot) => (
+                      <motion.span
+                        key={dot}
+                        animate={{ y: [0, -4, 0] }}
+                        transition={{
+                          duration: 0.6,
+                          repeat: Infinity,
+                          delay: dot * 0.15,
+                          ease: 'easeInOut',
+                        }}
+                        className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block"
+                      />
+                    ))}
+                  </div>
+                  <span className="font-bold text-slate-700">AI Tutor กำลังคิดและเรียบเรียงคำอธิบายทีละขั้นตอน...</span>
                 </div>
-                <div className="space-y-1.5 w-48 sm:w-60">
-                  <div className="h-2 bg-slate-200 rounded-full animate-pulse" />
-                  <div className="h-2 bg-slate-200 rounded-full animate-pulse w-4/5" />
+                <div className="space-y-1.5 w-48 sm:w-64">
+                  <div className="h-2 bg-slate-200/80 rounded-full animate-pulse" />
+                  <div className="h-2 bg-slate-200/80 rounded-full animate-pulse w-4/5" />
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
 
           <div ref={messagesEndRef} />
         </div>
-
-        {/* Quick Question Chips */}
-        <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          <span className="text-[11px] font-bold text-slate-400 shrink-0">ด่วน:</span>
-          <button
-            onClick={() =>
-              handleSendMessage(`ขอสรุปสูตรลัดและเทคนิคสำคัญของ ${currentSubjectObj?.name}`)
-            }
-            className="text-xs px-2.5 py-1 rounded-full bg-white hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 border border-slate-200 transition-colors shrink-0 cursor-pointer"
-          >
-            ⚡ สรุปสูตรลัด
-          </button>
-          <button
-            onClick={() =>
-              handleSendMessage(
-                `ขอดูตัวอย่างโจทย์ข้อยากของ ${currentSubjectObj?.name} พร้อมวิธีตัดช้อยส์`
-              )
-            }
-            className="text-xs px-2.5 py-1 rounded-full bg-white hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 border border-slate-200 transition-colors shrink-0 cursor-pointer"
-          >
-            🎯 โจทย์ระดับยาก
-          </button>
-          <button
-            onClick={() =>
-              handleSendMessage(
-                `วิเคราะห์จุดที่เด็กนักเรียนมักทำผิดมากที่สุดใน ${currentSubjectObj?.name}`
-              )
-            }
-            className="text-xs px-2.5 py-1 rounded-full bg-white hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 border border-slate-200 transition-colors shrink-0 cursor-pointer"
-          >
-            ⚠️ จุดที่ชอบโดนหลอก
-          </button>
-        </div>
-
-        {/* Chat Input Bar */}
-        <div className="p-4 border-t border-slate-100 bg-white">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendMessage();
-            }}
-            className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:bg-white transition-all"
-          >
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              disabled={isLoading}
-              placeholder={`ถามคำถามหรือให้ติว ${currentSubjectObj?.name || 'TGAT'}...`}
-              className="flex-1 bg-transparent border-none text-sm text-slate-800 placeholder-slate-400 focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !inputText.trim()}
-              className="p-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg transition-colors cursor-pointer shrink-0"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
-        </div>
       </div>
 
-      {/* Right Dashboard Column (4 Columns - Professional Polish Widgets) */}
-      <div className="col-span-1 lg:col-span-4 space-y-5 overflow-y-auto pr-1 hidden lg:block">
-        {/* Performance Quick Widget ("วิเคราะห์ล่าสุด") */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-indigo-600" />
-              <span>วิเคราะห์ล่าสุด</span>
-            </h3>
-            <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
-              +12% จากสัปดาห์ก่อน
+      {/* 3. PROMPT QUICK STARTERS BAR with Interactive Motion Chips */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold shrink-0 pl-1">
+          <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" />
+          <span>หัวข้อยอดนิยม:</span>
+        </div>
+
+        <motion.button
+          whileHover={{ y: -2, scale: 1.02 }}
+          whileTap={{ scale: 0.96 }}
+          onClick={() => handleSendMessage('ช่วยสอนตรีโกณมิติพื้นฐานหน่อย')}
+          disabled={isLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 border border-slate-200/80 rounded-xl text-xs text-slate-600 font-medium transition-all shadow-2xs shrink-0 cursor-pointer"
+        >
+          <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+          <span>ตรีโกณมิติพื้นฐาน</span>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ y: -2, scale: 1.02 }}
+          whileTap={{ scale: 0.96 }}
+          onClick={() => handleSendMessage('ฟิสิกส์เรื่องแรงและการเคลื่อนที่ กฎของนิวตัน')}
+          disabled={isLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 border border-slate-200/80 rounded-xl text-xs text-slate-600 font-medium transition-all shadow-2xs shrink-0 cursor-pointer"
+        >
+          <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+          <span>กฎการเคลื่อนที่นิวตัน</span>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ y: -2, scale: 1.02 }}
+          whileTap={{ scale: 0.96 }}
+          onClick={() => handleSendMessage('เทคนิคทำข้อสอบ Grammar ภาษาอังกฤษ TGAT1')}
+          disabled={isLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 border border-slate-200/80 rounded-xl text-xs text-slate-600 font-medium transition-all shadow-2xs shrink-0 cursor-pointer"
+        >
+          <HelpCircle className="w-3.5 h-3.5 text-sky-500" />
+          <span>Grammar TGAT1</span>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ y: -2, scale: 1.02 }}
+          whileTap={{ scale: 0.96 }}
+          onClick={() => handleSendMessage('ช่วยสรุปสูตรเคมีเรื่องปริมาณสารสัมพันธ์')}
+          disabled={isLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 border border-slate-200/80 rounded-xl text-xs text-slate-600 font-medium transition-all shadow-2xs shrink-0 cursor-pointer"
+        >
+          <BarChart2 className="w-3.5 h-3.5 text-emerald-500" />
+          <span>สูตรปริมาณสารสัมพันธ์</span>
+        </motion.button>
+      </div>
+
+      {/* 4. CHAT INPUT BAR WITH ENTER TO SEND & SHIFT+ENTER MULTILINE */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-2 sm:p-2.5 px-3 sm:px-4 flex items-end gap-3 shadow-xs">
+        {/* Hidden File Input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageChange}
+        />
+
+        {/* Image Attachment Button */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isLoading}
+          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors shrink-0 mb-0.5"
+          title="อัปโหลดรูปภาพโจทย์ปัญหา"
+        >
+          <ImageIcon className="w-5 h-5" />
+        </button>
+
+        {/* Image Preview Chip if Attached */}
+        {selectedImage && (
+          <div className="relative shrink-0 flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-xl p-1 pr-2 mb-0.5">
+            <img
+              src={selectedImage.previewUrl}
+              alt="attachment preview"
+              className="w-7 h-7 rounded-lg object-cover"
+            />
+            <span className="text-[11px] text-blue-700 font-medium max-w-[90px] truncate">
+              {selectedImage.file.name}
             </span>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                <span>TGAT1 การสื่อสารอังกฤษ</span>
-                <span className="text-emerald-600 font-bold">82%</span>
-              </div>
-              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div className="bg-emerald-500 h-full rounded-full" style={{ width: '82%' }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                <span>TGAT2 การคิดอย่างมีเหตุผล</span>
-                <span className="text-indigo-600 font-bold">74%</span>
-              </div>
-              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div className="bg-indigo-600 h-full rounded-full" style={{ width: '74%' }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                <span>TPAT3 ความถนัดวิทยาศาสตร์</span>
-                <span className="text-amber-600 font-bold">65%</span>
-              </div>
-              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div className="bg-amber-500 h-full rounded-full" style={{ width: '65%' }} />
-              </div>
-            </div>
-          </div>
-
-          {onNavigateToAnalytics && (
             <button
-              onClick={onNavigateToAnalytics}
-              className="w-full py-2.5 rounded-xl border border-slate-200 hover:border-indigo-300 bg-slate-50 hover:bg-indigo-50 text-indigo-600 font-bold text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+              type="button"
+              onClick={() => setSelectedImage(null)}
+              className="p-0.5 hover:bg-blue-200 rounded-full text-blue-600"
             >
-              <span>ดูรายงานฉบับเต็ม</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <X className="w-3.5 h-3.5" />
             </button>
-          )}
-        </div>
-
-        {/* Quick Mock Exam Banner ("สร้างข้อสอบด่วน") */}
-        <div className="bg-linear-to-tr from-indigo-700 to-violet-600 p-5 rounded-2xl text-white relative overflow-hidden shadow-md shadow-indigo-600/20">
-          <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none transform translate-x-4 translate-y-4">
-            <Sparkles className="w-36 h-36" />
           </div>
+        )}
 
-          <div className="relative z-10 space-y-2.5">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-amber-300 text-[10px] font-bold">
-              <Zap className="w-3 h-3 fill-amber-300" />
-              <span>AI Exam Generator</span>
-            </div>
+        {/* Multiline Textarea with Enter/Shift+Enter handler */}
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSendMessage();
+            }
+          }}
+          disabled={isLoading}
+          placeholder="พิมพ์คำถาม หรือตอบคำถามติวเตอร์... (Enter เพื่อส่ง, Shift + Enter เพื่อขึ้นบรรทัดใหม่)"
+          className="flex-1 bg-transparent border-none text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none resize-none py-2 max-h-32"
+        />
 
-            <h4 className="font-bold text-base leading-snug">
-              สร้างข้อสอบจำลอง {currentSubjectObj.name}
-            </h4>
+        {/* Send Button */}
+        <button
+          type="button"
+          onClick={() => handleSendMessage()}
+          disabled={isLoading || (!inputText.trim() && !selectedImage)}
+          aria-label="ส่งข้อความ"
+          className={`p-2 sm:p-2.5 rounded-xl transition-all shrink-0 mb-0.5 ${
+            inputText.trim() || selectedImage
+              ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-xs cursor-pointer active:scale-95'
+              : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+          }`}
+        >
+          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+        </button>
+      </div>
 
-            <p className="text-xs text-indigo-100 leading-relaxed">
-              สุ่มโจทย์ 5 ข้อตาม Blueprint พร้อมจับเวลาและเฉลยละเอียดแบบ Step-by-Step
-            </p>
-
-            {onNavigateToGenerator && (
-              <button
-                onClick={() => onNavigateToGenerator(selectedCategory, selectedSubject)}
-                className="mt-2 w-full py-2.5 bg-white hover:bg-slate-100 text-indigo-700 font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
-              >
-                <span>เริ่มทำข้อสอบทันที</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Activity Log Widget ("ประวัติกิจกรรม") */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-            <Clock className="w-4 h-4 text-slate-400" />
-            <span>ประวัติกิจกรรมล่าสุด</span>
-          </h3>
-
-          <div className="space-y-3">
-            <div className="flex items-start gap-3 text-xs">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-              <div>
-                <p className="font-semibold text-slate-800">ทำข้อสอบ TGAT1 ผ่าน 80%</p>
-                <p className="text-[10px] text-slate-400">วันนี้ 10:45 น.</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 text-xs">
-              <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
-              <div>
-                <p className="font-semibold text-slate-800">ถาม AI เรื่องสูตรฟิสิกส์</p>
-                <p className="text-[10px] text-slate-400">เมื่อวาน 21:15 น.</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 text-xs">
-              <div className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
-              <div>
-                <p className="font-semibold text-slate-800">ทบทวนข้อสอบ TPAT3</p>
-                <p className="text-[10px] text-slate-400">2 วันที่แล้ว</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Helper text under input */}
+      <div className="flex items-center justify-between text-[11px] text-slate-400 px-2">
+        <span>💡 AI จำบริบทเดิมได้ สามารถถามต่อได้ทันที เช่น "แล้วข้อ 2 ล่ะ?", "ทำไมถึงได้คำตอบนี้?"</span>
+        <span className="hidden sm:inline">กด Enter เพื่อส่ง | Shift+Enter เพื่อขึ้นบรรทัดใหม่</span>
       </div>
     </div>
   );

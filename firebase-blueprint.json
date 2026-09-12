@@ -96,6 +96,74 @@
         "analyzedAt": { "type": "string", "maxLength": 50 }
       },
       "required": ["id", "userId", "readinessScore", "estimatedPercentile", "overview", "analyzedAt"]
+    },
+    "OfficialExam": {
+      "title": "OfficialExam",
+      "description": "Standardized official exam archive and question bank such as TPAT3 ธ.ค. 66",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 50 },
+        "subject": { "type": "string", "maxLength": 100 },
+        "examCode": { "type": "string", "maxLength": 50 },
+        "term": { "type": "string", "maxLength": 50 },
+        "year": { "type": "string", "maxLength": 50 },
+        "timeLimitMinutes": { "type": "number" },
+        "difficulty": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "questions": { "type": "array" },
+        "totalQuestions": { "type": "number" },
+        "isOfficial": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "title", "category", "subject", "questions", "createdAt"]
+    },
+    "ExamPreparationItem": {
+      "title": "ExamPreparationItem",
+      "description": "Curated/admin-imported standardized real exam sets for exam preparation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "examType": { "type": "string", "maxLength": 50 },
+        "subject": { "type": "string", "maxLength": 150 },
+        "year": { "type": "string", "maxLength": 50 },
+        "term": { "type": "string", "maxLength": 50 },
+        "topic": { "type": "string", "maxLength": 200 },
+        "difficulty": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "timeLimitMinutes": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "questions": { "type": "array" },
+        "isOfficial": { "type": "boolean" },
+        "importedBy": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "title", "examType", "subject", "year", "questions", "createdAt"]
+    },
+    "AiPracticeExam": {
+      "title": "AiPracticeExam",
+      "description": "AI-generated practice exams for topic review and student practice",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "subject": { "type": "string", "maxLength": 150 },
+        "gradeLevel": { "type": "string", "maxLength": 50 },
+        "topic": { "type": "string", "maxLength": 200 },
+        "subtopic": { "type": "string", "maxLength": 200 },
+        "difficulty": { "type": "string", "maxLength": 50 },
+        "questionFormat": { "type": "string", "maxLength": 50 },
+        "timeLimitMinutes": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "questions": { "type": "array" },
+        "isAiGenerated": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "title", "subject", "questions", "createdAt"]
     }
   },
   "firestore": {
@@ -118,6 +186,18 @@
     "/users/{userId}/analysisReports/{reportId}": {
       "schema": "AnalysisReport",
       "description": "AI analysis reports on exam performance"
+    },
+    "/officialExams/{examId}": {
+      "schema": "OfficialExam",
+      "description": "Official shared exam bank and historical standardized tests"
+    },
+    "/exams/exam_preparation/items/{examId}": {
+      "schema": "ExamPreparationItem",
+      "description": "Admin-curated standardized exam sets categorized by subject, exam type, year and topic"
+    },
+    "/exams/ai_practice/items/{examId}": {
+      "schema": "AiPracticeExam",
+      "description": "AI-generated practice exams for topic-based training"
     }
   }
 }
